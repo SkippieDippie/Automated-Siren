@@ -17,7 +17,7 @@ jobs:
     name: Unit tests (host)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Build and run tests (ASan + UBSan)
         run: make -C tests
@@ -42,7 +42,7 @@ jobs:
             chips: 4
             artifact: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: true
 
@@ -73,7 +73,7 @@ jobs:
 
       - name: Upload firmware
         if: matrix.artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: siren-panel-firmware-${{ github.sha }}
           path: |
