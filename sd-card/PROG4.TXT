@@ -1,0 +1,9 @@
+# Program 4 - Monthly siren test
+# Short blast, then a continuous pulse pattern until STOP is pressed.
+NAME Siren Test
+ON 5
+OFF 5
+REPEAT FOREVER
+  ON 2
+  OFF 3
+END

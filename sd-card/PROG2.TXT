@@ -1,0 +1,4 @@
+# Program 2 - All clear
+# One continuous tone for 1 minute.
+NAME All Clear
+ON 60

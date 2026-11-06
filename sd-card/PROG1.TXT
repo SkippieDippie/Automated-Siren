@@ -1,0 +1,8 @@
+# Program 1 - Air raid warning
+# Rising and falling tone: the motor spins up while ON and
+# coasts down while OFF. 3 minutes in total.
+NAME Air Raid
+REPEAT 15
+  ON 8
+  OFF 4
+END

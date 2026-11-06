@@ -1,0 +1,7 @@
+# Program 3 - Fire alarm / call-out
+# Three long blasts separated by pauses.
+NAME Fire Alarm
+REPEAT 3
+  ON 15
+  OFF 7
+END
