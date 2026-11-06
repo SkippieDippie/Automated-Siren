@@ -7,7 +7,7 @@
 /* ---------------- fake port ---------------- */
 
 static uint32_t    f_now;
-static uint16_t    f_buttons;
+static uint32_t    f_buttons;
 static bool        f_siren;
 static char        f_lcd[2][17];
 static bool        f_card;
@@ -15,7 +15,7 @@ static const char *f_files[APP_NUM_PROGRAMS];
 static uint32_t    f_load_delay_ms;
 
 uint32_t port_millis(void)        { return f_now; }
-uint16_t port_buttons_raw(void)   { return f_buttons; }
+uint32_t port_buttons_raw(void)   { return f_buttons; }
 void port_siren_set(bool on)      { f_siren = on; }
 void port_lcd_line(uint8_t row, const char *text) { memcpy(f_lcd[row], text, 17); }
 bool port_sd_mount(void)          { return f_card; }
@@ -60,9 +60,9 @@ static void run(uint32_t ms)
 
 static void press(unsigned id)
 {
-    f_buttons |= (uint16_t)(1U << id);
+    f_buttons |= 1UL << id;
     run(50);
-    f_buttons &= (uint16_t)~(1U << id);
+    f_buttons &= ~(1UL << id);
     run(50);
 }
 
@@ -73,7 +73,7 @@ static void test_idle_screen(void)
     reset();
     run(20);
     CHECK_STR(f_lcd[0], "SIREN READY     ");
-    CHECK_STR(f_lcd[1], "SD OK  P1-P4    ");
+    CHECK_STR(f_lcd[1], "SD OK  P1-P6    ");
     CHECK(!f_siren);
 
     f_card = false;
@@ -244,6 +244,52 @@ static void test_forever_display(void)
     CHECK_EQ(player_state(&app.player), PLAYER_RUNNING);
 }
 
+static void test_button_decode(void)
+{
+    bool fault;
+
+    /* One 165, nothing pressed: all inputs pulled high. */
+    CHECK_EQ(buttons_decode_active_low(0xFFu, 8, &fault), 0);
+    CHECK(!fault);
+
+    /* MANUAL (input A, bit 0) and PROG3 (input E, bit 4) pressed. */
+    CHECK_EQ(buttons_decode_active_low(0xFFu & ~0x11u, 8, &fault), 0x11);
+    CHECK(!fault);
+
+    /* Bits above the chain are ignored. */
+    CHECK_EQ(buttons_decode_active_low(0x000000FEu, 8, &fault), 0x01);
+
+    /* Stuck-low data line: everything reads pressed -> fault, nothing pressed. */
+    CHECK_EQ(buttons_decode_active_low(0x00u, 8, &fault), 0);
+    CHECK(fault);
+    CHECK_EQ(buttons_decode_active_low(0x00u, 32, &fault), 0);
+    CHECK(fault);
+
+    /* Two chips, PROG14 = chip 1 input H = bit 15. */
+    CHECK_EQ(buttons_decode_active_low(0x7FFFu, 16, &fault), 0x8000);
+    CHECK(!fault);
+}
+
+static void test_stuck_data_line_keeps_siren_off(void)
+{
+    bool fault;
+    reset();
+    /* Simulate the port with a stuck-low 165 data line for 1 second. */
+    f_buttons = buttons_decode_active_low(0x00u, 8U * APP_BUTTON_CHIPS, &fault);
+    run(1000);
+    CHECK(!f_siren);
+    CHECK_STR(f_lcd[0], "SIREN READY     ");
+}
+
+static void test_last_program_button(void)
+{
+    reset();
+    f_files[APP_NUM_PROGRAMS - 1] = "NAME Last\nON 5\n";
+    press(BTN_PROG1 + APP_NUM_PROGRAMS - 1);
+    CHECK(f_siren);
+    CHECK_STR(f_lcd[0], "P6 Last         ");
+}
+
 static void test_format_duration(void)
 {
     char b[6];
@@ -272,4 +318,7 @@ void test_app_all(void)
     RUN(test_timing_accounts_for_load_delay);
     RUN(test_forever_display);
     RUN(test_format_duration);
+    RUN(test_button_decode);
+    RUN(test_stuck_data_line_keeps_siren_off);
+    RUN(test_last_program_button);
 }

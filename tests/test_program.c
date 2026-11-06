@@ -112,7 +112,7 @@ static void test_too_many_steps(void)
 static void test_example_files(void)
 {
     static char buf[4096];
-    for (int i = 1; i <= 4; i++) {
+    for (int i = 1; i <= 6; i++) {
         char path[64];
         snprintf(path, sizeof path, "../sd-card/PROG%d.TXT", i);
         FILE *f = fopen(path, "rb");

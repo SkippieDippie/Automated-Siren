@@ -1,23 +1,32 @@
 /*
- * HD44780 16x2 character LCD behind a PCF8574 I2C expander
- * (the common "LCD1602 I2C" module).
+ * HD44780-compatible 16x2 character LCD driven directly in 4-bit mode.
+ *
+ * Six GPIOs: RS, E, D4..D7. The LCD's RW pin must be tied to GND
+ * (write-only), so the display never drives the MCU pins and the busy
+ * flag is never read; fixed delays are used instead.
  */
 #ifndef LCD1602_H
 #define LCD1602_H
 
-#include <stdbool.h>
 #include <stdint.h>
 
 #include "stm32f1xx_hal.h"
 
-/* Probes the given 7-bit addresses, initialises the display.
- * Returns false if no backpack answered. */
-bool lcd_init(I2C_HandleTypeDef *i2c, const uint8_t *addrs, uint8_t n_addrs);
+typedef struct {
+    GPIO_TypeDef *port;
+    uint16_t      pin;
+} lcd_pin_t;
 
+typedef struct {
+    lcd_pin_t rs;
+    lcd_pin_t e;
+    lcd_pin_t d[4];   /* D4, D5, D6, D7 */
+} lcd_pins_t;
+
+void lcd_init(const lcd_pins_t *pins);
 void lcd_clear(void);
-void lcd_backlight(bool on);
 
-/* Write exactly 16 characters to row 0 or 1. */
+/* Write up to 16 characters to row 0 or 1 (padded with spaces). */
 void lcd_write_line(uint8_t row, const char *text);
 
 #endif /* LCD1602_H */

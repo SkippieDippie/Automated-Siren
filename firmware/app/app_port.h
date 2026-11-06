@@ -32,7 +32,7 @@ typedef enum {
 uint32_t port_millis(void);
 
 /* Bitmask of currently pressed buttons (raw, not debounced). */
-uint16_t port_buttons_raw(void);
+uint32_t port_buttons_raw(void);
 
 /* Energise / de-energise the siren motor. */
 void port_siren_set(bool on);

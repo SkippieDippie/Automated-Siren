@@ -31,6 +31,7 @@ add_executable(siren-panel
     firmware/core/port_stm32.c
     firmware/core/stm32f1xx_it.c
     firmware/core/syscalls.c
+    firmware/drivers/hc165.c
     firmware/drivers/lcd1602.c
     firmware/drivers/sd_spi.c
     firmware/drivers/diskio_sd.c
@@ -47,7 +48,6 @@ add_executable(siren-panel
     ${HAL}/Src/stm32f1xx_hal_flash_ex.c
     ${HAL}/Src/stm32f1xx_hal_gpio.c
     ${HAL}/Src/stm32f1xx_hal_gpio_ex.c
-    ${HAL}/Src/stm32f1xx_hal_i2c.c
     ${HAL}/Src/stm32f1xx_hal_iwdg.c
     ${HAL}/Src/stm32f1xx_hal_pwr.c
     ${HAL}/Src/stm32f1xx_hal_rcc.c

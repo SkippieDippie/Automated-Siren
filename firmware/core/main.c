@@ -19,7 +19,7 @@ int main(void)
     gpio_init();
     clock_init();
 
-    port_init();          /* SPI, I2C, LCD, SD */
+    port_init();          /* buttons, LCD, SD */
     watchdog_init();
 
     static app_t app;
@@ -77,7 +77,6 @@ static void clock_init(void)
 static void gpio_init(void)
 {
     GPIO_InitTypeDef g = {0};
-    static const board_pin_t buttons[] = BOARD_BUTTONS;
 
     __HAL_RCC_GPIOA_CLK_ENABLE();
     __HAL_RCC_GPIOB_CLK_ENABLE();
@@ -95,13 +94,6 @@ static void gpio_init(void)
     HAL_GPIO_WritePin(LED_PORT, LED_PIN, GPIO_PIN_SET);   /* LED off */
     g.Pin = LED_PIN;
     HAL_GPIO_Init(LED_PORT, &g);
-
-    for (size_t i = 0; i < sizeof buttons / sizeof buttons[0]; i++) {
-        g.Pin = buttons[i].pin;
-        g.Mode = GPIO_MODE_INPUT;
-        g.Pull = GPIO_PULLUP;
-        HAL_GPIO_Init(buttons[i].port, &g);
-    }
 }
 
 static void watchdog_init(void)

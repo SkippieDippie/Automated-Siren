@@ -1,7 +1,8 @@
 # Siren program file format
 
 Programs are plain-text files in the **root directory** of a FAT/FAT32
-SD card, named `PROG1.TXT` … `PROG4.TXT`. Button **P1** runs `PROG1.TXT`,
+SD card, named `PROG1.TXT`, `PROG2.TXT`, … (one per program button: 6 with
+one 74HC165, up to 30 with four). Button **P1** runs `PROG1.TXT`,
 button **P2** runs `PROG2.TXT`, and so on. Files are read again each time a
 button is pressed, so you can edit them on a PC and put the card back
 without restarting the panel.

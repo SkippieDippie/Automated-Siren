@@ -1,104 +1,109 @@
 #include "lcd1602.h"
 
-/* PCF8574 -> HD44780 wiring used by virtually all backpacks:
- * P0=RS P1=RW P2=E P3=Backlight P4..P7=D4..D7 */
-#define PIN_RS  0x01U
-#define PIN_E   0x04U
-#define PIN_BL  0x08U
+#include <stdbool.h>
 
-#define I2C_TIMEOUT_MS 20
+/* HD44780 timing (worst case, at the slowest 190 kHz internal clock):
+ * most instructions 37 us -> use 50 us; clear/home 1.52 ms -> use 2 ms. */
+#define LCD_CMD_US    50U
+#define LCD_CLEAR_MS  2U
 
-static I2C_HandleTypeDef *s_i2c;
-static uint16_t s_addr;          /* 8-bit HAL address */
-static uint8_t  s_backlight = PIN_BL;
-static bool     s_ok;
+static const lcd_pins_t *s_pins;
 
-/* Encode one byte as two 4-bit transfers, each with an E pulse:
- * 4 expander writes per byte. */
-static uint8_t *encode(uint8_t *p, uint8_t value, uint8_t flags)
+/* ------------------------------------------------------------------ */
+/* Microsecond delay using the Cortex-M3 DWT cycle counter              */
+/* ------------------------------------------------------------------ */
+
+static void delay_init(void)
 {
-    uint8_t hi = (uint8_t)((value & 0xF0U) | flags | s_backlight);
-    uint8_t lo = (uint8_t)(((value << 4) & 0xF0U) | flags | s_backlight);
-    *p++ = (uint8_t)(hi | PIN_E);
-    *p++ = hi;
-    *p++ = (uint8_t)(lo | PIN_E);
-    *p++ = lo;
-    return p;
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+    DWT->CYCCNT = 0;
+    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
 }
 
-static void send(const uint8_t *buf, uint16_t len)
+static void delay_us(uint32_t us)
 {
-    if (s_ok) {
-        (void)HAL_I2C_Master_Transmit(s_i2c, s_addr, (uint8_t *)buf, len, I2C_TIMEOUT_MS);
+    uint32_t start = DWT->CYCCNT;
+    uint32_t cycles = us * (SystemCoreClock / 1000000U);
+    while (DWT->CYCCNT - start < cycles) {
     }
 }
 
-static void command(uint8_t cmd)
+/* ------------------------------------------------------------------ */
+
+static void pin_write(const lcd_pin_t *p, bool high)
 {
-    uint8_t buf[4];
-    send(buf, (uint16_t)(encode(buf, cmd, 0) - buf));
+    HAL_GPIO_WritePin(p->port, p->pin, high ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
 
-/* Init-sequence nibble (8-bit mode commands before switching to 4-bit). */
-static void nibble(uint8_t hi)
+/* Put 4 bits on D4..D7 and pulse E (data latched on the falling edge). */
+static void write_nibble(uint8_t nibble)
 {
-    uint8_t buf[2] = { (uint8_t)(hi | PIN_E | s_backlight), (uint8_t)(hi | s_backlight) };
-    send(buf, 2);
+    for (uint8_t i = 0; i < 4; i++) {
+        pin_write(&s_pins->d[i], (nibble >> i) & 1U);
+    }
+    pin_write(&s_pins->e, true);
+    delay_us(1);                  /* E high >= 450 ns */
+    pin_write(&s_pins->e, false);
+    delay_us(1);                  /* E cycle >= 1 us  */
 }
 
-bool lcd_init(I2C_HandleTypeDef *i2c, const uint8_t *addrs, uint8_t n_addrs)
+static void write_byte(uint8_t value, bool is_data)
 {
-    s_i2c = i2c;
-    s_ok = false;
-    for (uint8_t i = 0; i < n_addrs; i++) {
-        uint16_t a = (uint16_t)(addrs[i] << 1);
-        if (HAL_I2C_IsDeviceReady(i2c, a, 2, I2C_TIMEOUT_MS) == HAL_OK) {
-            s_addr = a;
-            s_ok = true;
-            break;
-        }
-    }
-    if (!s_ok) {
-        return false;
+    pin_write(&s_pins->rs, is_data);
+    write_nibble((uint8_t)(value >> 4));
+    write_nibble((uint8_t)(value & 0x0FU));
+    delay_us(LCD_CMD_US);
+}
+
+void lcd_init(const lcd_pins_t *pins)
+{
+    GPIO_InitTypeDef g = {0};
+
+    s_pins = pins;
+    delay_init();
+
+    g.Mode = GPIO_MODE_OUTPUT_PP;
+    g.Speed = GPIO_SPEED_FREQ_LOW;
+    const lcd_pin_t *all[6] = { &pins->rs, &pins->e, &pins->d[0],
+                                &pins->d[1], &pins->d[2], &pins->d[3] };
+    for (uint8_t i = 0; i < 6; i++) {
+        HAL_GPIO_WritePin(all[i]->port, all[i]->pin, GPIO_PIN_RESET);
+        g.Pin = all[i]->pin;
+        HAL_GPIO_Init(all[i]->port, &g);
     }
 
-    HAL_Delay(50);                    /* power-on wait          */
-    nibble(0x30); HAL_Delay(5);       /* HD44780 reset sequence */
-    nibble(0x30); HAL_Delay(1);
-    nibble(0x30); HAL_Delay(1);
-    nibble(0x20); HAL_Delay(1);       /* 4-bit mode             */
+    /* Reset by instruction (HD44780 datasheet, figure 24): works whatever
+     * state the controller was left in, e.g. after an MCU-only reset. */
+    HAL_Delay(50);                /* > 40 ms after Vcc rises to 2.7 V */
+    write_nibble(0x3);
+    HAL_Delay(5);                 /* > 4.1 ms */
+    write_nibble(0x3);
+    delay_us(150);                /* > 100 us */
+    write_nibble(0x3);
+    delay_us(LCD_CMD_US);
+    write_nibble(0x2);            /* switch to 4-bit interface */
+    delay_us(LCD_CMD_US);
 
-    command(0x28);                    /* 4-bit, 2 lines, 5x8    */
-    command(0x0C);                    /* display on, no cursor  */
-    command(0x06);                    /* entry: increment       */
+    write_byte(0x28, false);      /* 4-bit, 2 lines, 5x8 font */
+    write_byte(0x08, false);      /* display off              */
     lcd_clear();
-    return true;
+    write_byte(0x06, false);      /* entry mode: increment    */
+    write_byte(0x0C, false);      /* display on, no cursor    */
 }
 
 void lcd_clear(void)
 {
-    command(0x01);
-    HAL_Delay(2);
-}
-
-void lcd_backlight(bool on)
-{
-    s_backlight = on ? PIN_BL : 0U;
-    uint8_t b = s_backlight;
-    send(&b, 1);
+    write_byte(0x01, false);
+    HAL_Delay(LCD_CLEAR_MS);
 }
 
 void lcd_write_line(uint8_t row, const char *text)
 {
-    /* Address command + 16 chars sent as one I2C transaction (~7 ms at
-     * 100 kHz), so the main loop is not held up character by character.
-     * An I2C byte (~90 us) is longer than any HD44780 data write needs. */
-    uint8_t buf[4 * 17];
-    uint8_t *p = encode(buf, (uint8_t)(0x80U | (row ? 0x40U : 0x00U)), 0);
+    /* ~17 x 55 us = under 1 ms per line. */
+    write_byte((uint8_t)(0x80U | (row ? 0x40U : 0x00U)), false);
     bool ended = false;
     for (uint8_t i = 0; i < 16; i++) {
         ended = ended || text[i] == '\0';
-        p = encode(p, (uint8_t)(ended ? ' ' : text[i]), PIN_RS);
+        write_byte((uint8_t)(ended ? ' ' : text[i]), true);
     }
-    send(buf, (uint16_t)(p - buf));
 }

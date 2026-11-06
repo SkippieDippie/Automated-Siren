@@ -4,9 +4,12 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "app_config.h"
 #include "app_port.h"
+#include "buttons.h"
 #include "board.h"
 #include "ff.h"
+#include "hc165.h"
 #include "lcd1602.h"
 #include "port_stm32.h"
 #include "sd_spi.h"
@@ -15,11 +18,17 @@
 #define PROGRAM_TEXT_MAX 2048
 
 static SPI_HandleTypeDef hspi;
-static I2C_HandleTypeDef hi2c;
 static FATFS fs;
 static char text_buf[PROGRAM_TEXT_MAX + 1];
 
-static const board_pin_t s_buttons[] = BOARD_BUTTONS;
+static const hc165_t s_buttons = {
+    .load_port = BTN_LOAD_PORT, .load_pin = BTN_LOAD_PIN,
+    .clk_port  = BTN_CLK_PORT,  .clk_pin  = BTN_CLK_PIN,
+    .data_port = BTN_DATA_PORT, .data_pin = BTN_DATA_PIN,
+    .chips     = APP_BUTTON_CHIPS,
+};
+
+static const lcd_pins_t s_lcd_pins = LCD_PINS;
 
 /* ------------------------------------------------------------------ */
 /* Peripheral init                                                     */
@@ -65,36 +74,11 @@ static void spi_init(void)
     sd_spi_attach(&hspi);
 }
 
-static void i2c_init(void)
-{
-    GPIO_InitTypeDef g = {0};
-
-    __HAL_RCC_I2C1_CLK_ENABLE();
-    g.Pin = GPIO_PIN_6 | GPIO_PIN_7;          /* SCL, SDA */
-    g.Mode = GPIO_MODE_AF_OD;
-    g.Speed = GPIO_SPEED_FREQ_HIGH;
-    HAL_GPIO_Init(GPIOB, &g);
-
-    hi2c.Instance = LCD_I2C;
-    hi2c.Init.ClockSpeed = LCD_I2C_SPEED_HZ;
-    hi2c.Init.DutyCycle = I2C_DUTYCYCLE_2;
-    hi2c.Init.OwnAddress1 = 0;
-    hi2c.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
-    hi2c.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
-    hi2c.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
-    hi2c.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-    if (HAL_I2C_Init(&hi2c) != HAL_OK) {
-        Error_Handler();
-    }
-}
-
 void port_init(void)
 {
-    static const uint8_t lcd_addrs[] = LCD_I2C_ADDRS;
-
+    hc165_init(&s_buttons);
+    lcd_init(&s_lcd_pins);
     spi_init();
-    i2c_init();
-    (void)lcd_init(&hi2c, lcd_addrs, (uint8_t)sizeof lcd_addrs);
 }
 
 /* ------------------------------------------------------------------ */
@@ -106,15 +90,12 @@ uint32_t port_millis(void)
     return HAL_GetTick();
 }
 
-uint16_t port_buttons_raw(void)
+uint32_t port_buttons_raw(void)
 {
-    uint16_t mask = 0;
-    for (unsigned i = 0; i < sizeof s_buttons / sizeof s_buttons[0]; i++) {
-        if (HAL_GPIO_ReadPin(s_buttons[i].port, s_buttons[i].pin) == GPIO_PIN_RESET) {
-            mask |= (uint16_t)(1U << i);
-        }
-    }
-    return mask;
+    bool fault;
+    uint32_t levels = hc165_read(&s_buttons);
+    /* A stuck-low data line reads as "nothing pressed" (see buttons.h). */
+    return buttons_decode_active_low(levels, 8U * APP_BUTTON_CHIPS, &fault);
 }
 
 void port_siren_set(bool on)

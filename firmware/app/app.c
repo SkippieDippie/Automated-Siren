@@ -142,7 +142,10 @@ static void compose_screen(app_t *app, uint32_t now, char out[2][17])
 
     set_line(out[0], "SIREN READY");
     switch (app->sd) {
-    case SD_OK:      set_line(out[1], "SD OK  P1-P4"); break;
+    case SD_OK:
+        snprintf(buf, sizeof buf, "SD OK  P1-P%u", (unsigned)APP_NUM_PROGRAMS);
+        set_line(out[1], buf);
+        break;
     case SD_MISSING: set_line(out[1], "NO SD CARD"); break;
     default:         set_line(out[1], "SD ?"); break;
     }

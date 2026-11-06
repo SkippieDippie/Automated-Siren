@@ -7,12 +7,21 @@ void buttons_init(buttons_t *b)
     memset(b, 0, sizeof(*b));
 }
 
-void buttons_update(buttons_t *b, uint16_t raw)
+uint32_t buttons_decode_active_low(uint32_t raw_levels, unsigned n_inputs, bool *fault)
 {
-    uint16_t prev = b->stable;
+    uint32_t mask = (n_inputs >= 32U) ? 0xFFFFFFFFUL : ((1UL << n_inputs) - 1U);
+    uint32_t pressed = ~raw_levels & mask;
+
+    *fault = (n_inputs > 1U && pressed == mask);
+    return *fault ? 0U : pressed;
+}
+
+void buttons_update(buttons_t *b, uint32_t raw)
+{
+    uint32_t prev = b->stable;
 
     for (unsigned i = 0; i < BUTTONS_MAX; i++) {
-        uint16_t bit = (uint16_t)(1U << i);
+        uint32_t bit = 1UL << i;
         bool raw_on = (raw & bit) != 0;
         bool st_on = (b->stable & bit) != 0;
 
@@ -23,6 +32,6 @@ void buttons_update(buttons_t *b, uint16_t raw)
             b->stable ^= bit;
         }
     }
-    b->pressed = (uint16_t)(b->stable & ~prev);
-    b->released = (uint16_t)(~b->stable & prev);
+    b->pressed = b->stable & ~prev;
+    b->released = ~b->stable & prev;
 }

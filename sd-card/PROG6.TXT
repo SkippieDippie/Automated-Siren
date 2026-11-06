@@ -1,0 +1,8 @@
+# Program 6 - Wail
+# Short ON/OFF cycles keep the motor between speeds, giving a
+# continuously rising and falling wail. 2 minutes.
+NAME Wail
+REPEAT 24
+  ON 3
+  OFF 2
+END
