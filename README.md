@@ -1,5 +1,7 @@
 # Siren Control Panel
 
+[![CI](https://github.com/SkippieDippie/Automated-Siren/actions/workflows/ci.yml/badge.svg)](https://github.com/SkippieDippie/Automated-Siren/actions/workflows/ci.yml)
+
 Firmware for an STM32-based control panel for a motor-driven siren.
 
 * **Manual control.** While the MANUAL button is held, the siren motor is
@@ -99,3 +101,16 @@ and timeout, and the LCD screens.
 ```bash
 make -C tests
 ```
+
+## Continuous integration
+
+GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml))
+runs on every push and pull request:
+
+* the host unit tests, with AddressSanitizer and UndefinedBehaviorSanitizer;
+* firmware builds in release, debug and 4-button-chip configurations, with
+  warnings treated as errors.
+
+The release build's `.elf`, `.bin`, `.hex` and `.map` files are attached
+to each run as a downloadable artifact. Flash the `.bin` with the commands
+above.
