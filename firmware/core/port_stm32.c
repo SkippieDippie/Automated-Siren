@@ -90,6 +90,11 @@ uint32_t port_millis(void)
     return HAL_GetTick();
 }
 
+uint32_t port_buttons_levels(void)
+{
+    return hc165_read(&s_buttons);
+}
+
 uint32_t port_buttons_raw(void)
 {
     bool fault;

@@ -2,7 +2,7 @@
  * Cortex-M3 exception handlers.
  */
 #include "stm32f1xx_hal.h"
-#include "port_stm32.h"
+#include "system.h"
 
 void NMI_Handler(void)        { }
 void HardFault_Handler(void)  { Error_Handler(); }

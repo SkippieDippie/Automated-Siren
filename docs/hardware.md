@@ -31,6 +31,7 @@ All pins are defined in [`firmware/core/board.h`](../firmware/core/board.h).
 | Siren output         | PB1       | Relay/SSR driver (see below)         |
 | Status LED           | PC13      | On-board LED, lit while siren powered |
 | SWDIO / SWCLK        | PA13 / PA14 | ST-Link (programming/debugging)   |
+| Serial log TX        | PA9       | USB-serial adapter RX, 115200 baud (bring-up firmware only, optional) |
 
 ## Buttons: 74HC165 shift register
 
