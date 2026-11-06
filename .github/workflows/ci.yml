@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Unit tests (host)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and run tests (ASan + UBSan)
+        run: make -C tests
+
+  firmware:
+    name: Firmware (${{ matrix.name }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: release
+            build_type: MinSizeRel
+            chips: 1
+            artifact: true
+          - name: debug
+            build_type: Debug
+            chips: 1
+            artifact: false
+          - name: 4 button chips
+            build_type: MinSizeRel
+            chips: 4
+            artifact: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install ARM toolchain
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            gcc-arm-none-eabi libnewlib-arm-none-eabi cmake ninja-build
+          arm-none-eabi-gcc --version | head -1
+
+      - name: Configure
+        run: >
+          cmake -S . -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+          -DCMAKE_C_FLAGS="-DAPP_BUTTON_CHIPS=${{ matrix.chips }} -Werror"
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Memory usage
+        run: |
+          {
+            echo "### Firmware size (${{ matrix.name }})"
+            echo '```'
+            arm-none-eabi-size build/siren-panel.elf
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload firmware
+        if: matrix.artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: siren-panel-firmware-${{ github.sha }}
+          path: |
+            build/siren-panel.elf
+            build/siren-panel.bin
+            build/siren-panel.hex
+            build/siren-panel.map
+          if-no-files-found: error
