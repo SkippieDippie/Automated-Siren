@@ -52,7 +52,9 @@ firmware/
              buttons.c  - debouncing
              app.c      - control logic and LCD screens
   core/      STM32 entry point, clock/GPIO/watchdog, port implementation
-  drivers/   LCD1602 (4-bit parallel), 74HC165 buttons, SD card over SPI, FatFs glue
+  drivers/   LCD1602 (4-bit parallel), 74HC165 buttons, SD card over SPI,
+             FatFs glue, serial log
+  bringup/   Hardware test firmware (docs/bringup.md)
   config/    HAL and FatFs configuration
 tests/       Host unit tests (fake hardware port)
 sd-card/     Example program files: copy them to the card's root folder
@@ -75,7 +77,12 @@ cmake -S . -B build
 cmake --build build
 ```
 
-Output: `build/siren-panel.elf`, `.bin` and `.hex`.
+This builds two firmwares:
+
+* `build/siren-panel.elf` / `.bin` / `.hex`: the siren control panel.
+* `build/siren-bringup.elf` / `.bin` / `.hex`: a hardware test firmware
+  for checking a newly built board (LCD, buttons, SD card, siren output)
+  before running the real thing. See [docs/bringup.md](docs/bringup.md).
 Use `-DCMAKE_BUILD_TYPE=Debug` for a debug build; this also keeps the
 watchdog from resetting the MCU while it is halted in the debugger.
 
@@ -111,6 +118,6 @@ runs on every push and pull request:
 * firmware builds in release, debug and 4-button-chip configurations, with
   warnings treated as errors.
 
-The release build's `.elf`, `.bin`, `.hex` and `.map` files are attached
-to each run as a downloadable artifact. Flash the `.bin` with the commands
+The release build's `.elf`, `.bin`, `.hex` and `.map` files, plus the
+bring-up firmware, are attached to each run as a downloadable artifact. Flash the `.bin` with the commands
 above.

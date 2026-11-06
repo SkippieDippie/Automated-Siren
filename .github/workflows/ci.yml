@@ -67,7 +67,7 @@ jobs:
           {
             echo "### Firmware size (${{ matrix.name }})"
             echo '```'
-            arm-none-eabi-size build/siren-panel.elf
+            arm-none-eabi-size build/siren-panel.elf build/siren-bringup.elf
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -81,4 +81,7 @@ jobs:
             build/siren-panel.bin
             build/siren-panel.hex
             build/siren-panel.map
+            build/siren-bringup.elf
+            build/siren-bringup.bin
+            build/siren-bringup.hex
           if-no-files-found: error
